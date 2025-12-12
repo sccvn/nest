@@ -1,0 +1,101 @@
+@startuml HTTP Request Lifecycle
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 11
+
+title NestJS HTTP Request - Complete Processing Pipeline
+
+participant "HTTP Client" as CLIENT
+participant "Express/Fastify" as ADAPTER
+participant "Middleware" as MIDDLEWARE
+participant "GuardsConsumer" as GUARDS
+participant "PipesConsumer" as PIPES
+participant "InterceptorsConsumer" as INTERCEPTORS
+participant "Route Handler" as HANDLER
+participant "ExceptionFilters" as FILTERS
+participant "Response" as RESP
+
+CLIENT ->> ADAPTER: HTTP Request\n(GET /users/1)
+activate ADAPTER
+
+ADAPTER ->> MIDDLEWARE: execute(request, response, next)
+activate MIDDLEWARE
+MIDDLEWARE ->> ADAPTER: next() → continue
+deactivate MIDDLEWARE
+
+ADAPTER ->> GUARDS: canActivate(context)
+activate GUARDS
+note right of GUARDS
+    Check:
+    - @UseGuards(AuthGuard)
+    - @UseGuards(RoleGuard)
+    - Scoped & Global guards
+end note
+
+alt Guard Fails
+    GUARDS ->> FILTERS: throw UnauthorizedException
+else Guard Passes
+    GUARDS ->> ADAPTER: return true
+    deactivate GUARDS
+
+    ADAPTER ->> PIPES: transform(value, metadata)
+    activate PIPES
+    note right of PIPES
+        Apply:
+        - @Param('id', ParseIntPipe)
+        - @Body(ValidationPipe)
+        - Custom pipes
+        - Transform/Validate data
+    end note
+    PIPES ->> ADAPTER: transformed value
+    deactivate PIPES
+
+    ADAPTER ->> INTERCEPTORS: intercept(context, next)
+    activate INTERCEPTORS
+    note right of INTERCEPTORS
+        Before Handler:
+        - Logging
+        - Performance tracking
+        - Data transformation
+    end note
+
+    INTERCEPTORS ->> HANDLER: next.handle()
+    activate HANDLER
+    note right of HANDLER
+        Execute route handler:
+        @Get(':id')
+        getUser(id: number)
+    end note
+
+    HANDLER ->> HANDLER: Handler logic
+    HANDLER -->> INTERCEPTORS: Observable<Response>
+    deactivate HANDLER
+
+    note right of INTERCEPTORS
+        After Handler:
+        - Transform response
+        - Add headers
+        - Serialize data
+    end note
+    INTERCEPTORS ->> ADAPTER: response
+    deactivate INTERCEPTORS
+
+    ADAPTER ->> RESP: send(response)
+end
+
+FILTERS ->> RESP: error response
+deactivate FILTERS
+
+RESP ->> CLIENT: HTTP Response\n(200 / 4xx / 5xx)
+deactivate ADAPTER
+
+note over CLIENT, RESP
+    Exception Handling:
+    1. Any exception caught
+    2. Find matching @Catch filter
+    3. Filter determines response
+    4. Send error response
+end note
+
+@enduml

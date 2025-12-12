@@ -1,0 +1,220 @@
+@startuml NestJS Design Patterns
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 10
+
+title NestJS Core Design Patterns Used in Framework
+
+package "1. Dependency Injection Pattern" {
+    interface IService {
+        execute(): void
+    }
+
+    class DatabaseService implements IService {
+        execute(): void
+    }
+
+    class UserService {
+        constructor(private db: DatabaseService) {}
+    }
+
+    note right of UserService
+        Dependencies injected
+        via constructor
+        - Loose coupling
+        - Testable
+        - Reusable
+    end note
+}
+
+package "2. Factory Pattern" {
+    class ProviderFactory {
+        + create(config): Provider
+    }
+
+    class ClassProvider {
+        useClass: Type
+    }
+
+    class FactoryProvider {
+        useFactory: Function
+    }
+
+    class ValueProvider {
+        useValue: any
+    }
+
+    ProviderFactory --> ClassProvider
+    ProviderFactory --> FactoryProvider
+    ProviderFactory --> ValueProvider
+
+    note right of ProviderFactory
+        Creates different
+        provider instances
+        based on configuration
+    end note
+}
+
+package "3. Adapter Pattern" {
+    interface HttpServer {
+        listen(port): void
+        use(middleware): void
+    }
+
+    class ExpressAdapter implements HttpServer {
+        private express: Express
+    }
+
+    class FastifyAdapter implements HttpServer {
+        private fastify: Fastify
+    }
+
+    note right of ExpressAdapter
+        Different HTTP frameworks
+        wrapped in common interface
+        Framework-agnostic core
+    end note
+}
+
+package "4. Module Pattern" {
+    class Module {
+        imports: Module[]
+        providers: Provider[]
+        controllers: Controller[]
+        exports: any[]
+    }
+
+    note right of Module
+        - Encapsulation
+        - Clear boundaries
+        - Explicit dependencies
+        - Public API via exports
+    end note
+}
+
+package "5. Middleware Chain Pattern" {
+    component Middleware1 [Middleware 1]
+    component Middleware2 [Middleware 2]
+    component Middleware3 [Middleware 3]
+    component Handler [Route Handler]
+
+    Middleware1 --> Middleware2
+    Middleware2 --> Middleware3
+    Middleware3 --> Handler
+
+    note right of Middleware1
+        Express-style middleware
+        chaining with next() callback
+        Linear request processing
+    end note
+}
+
+package "6. Strategy Pattern" {
+    interface ExceptionFilter {
+        catch(exception, host): void
+    }
+
+    class HttpExceptionFilter implements ExceptionFilter {
+        catch(): void
+    }
+
+    class CustomExceptionFilter implements ExceptionFilter {
+        catch(): void
+    }
+
+    note right of ExceptionFilter
+        Different error handling
+        strategies interchangeable
+        at decoration time
+    end note
+}
+
+package "7. Observer Pattern" {
+    class Subject {
+        - observers: Observer[]
+        + subscribe(observer)
+        + notify()
+    }
+
+    note right of Subject
+        RxJS Observable integration
+        Reactive programming model
+        Async operation handling
+    end note
+}
+
+package "8. Decorator Pattern (GoF)" {
+    class BaseGuard {
+        canActivate(): boolean
+    }
+
+    class AuthGuard extends BaseGuard {
+        canActivate(): boolean
+    }
+
+    note right of AuthGuard
+        Dynamically add behavior
+        to guards/pipes/interceptors
+        at decoration time
+    end note
+}
+
+package "9. Lazy Initialization Pattern" {
+    component InstanceWrapper {
+        - instance: T | null
+        + getInstance(): T
+    }
+
+    note right of InstanceWrapper
+        Instances created on first
+        request, not at startup
+        Reduces boot time
+    end note
+}
+
+package "10. Context Object Pattern" {
+    class ExecutionContext {
+        switchToHttp()
+        switchToWs()
+        switchToRpc()
+    }
+
+    note right of ExecutionContext
+        Single abstraction over
+        HTTP, WebSocket, gRPC
+        Polymorphic behavior
+    end note
+}
+
+package "11. Singleton Pattern" {
+    class SingletonService {
+        - static instance: SingletonService
+        + getInstance(): SingletonService
+    }
+
+    note right of SingletonService
+        Default scope for providers
+        Single instance per app
+        Shared across requests
+    end note
+}
+
+package "12. Chain of Responsibility" {
+    component Guard [Guard]
+    component Pipe [Pipe]
+    component Handler [Handler]
+    component Interceptor [Interceptor]
+
+    Guard --> Pipe
+    Pipe --> Handler
+    Handler --> Interceptor
+
+    note right of Guard
+        Request passes through
+        chain of enhancers
+        Each can accept/reject
+    end note
+}
+
+@enduml

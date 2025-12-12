@@ -1,0 +1,224 @@
+@startuml Provider Scopes & Instance Management
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 11
+
+title NestJS Provider Scopes - Instance Lifecycle Management
+
+package "Application Lifetime" {
+    component Bootstrap ["🚀 Application Bootstrap"]
+    component Running ["⚙️ Running / Request Processing"]
+    component Shutdown ["🛑 Application Shutdown"]
+
+    Bootstrap --> Running
+    Running --> Shutdown
+}
+
+package "SINGLETON Scope" {
+    database SingletonCache [
+        Instance Cache
+        ----
+        One instance per app
+        Shared globally
+    ]
+
+    class SingletonProvider {
+        scope: Scope = 'SINGLETON'
+        instance: Service | null
+    }
+
+    note right of SingletonProvider
+        Created on first injection
+        Cached in InstanceWrapper
+        Reused for all requests
+        Memory efficient
+        Good for: Database, Config
+    end note
+
+    SingletonProvider --> SingletonCache: caches
+}
+
+package "TRANSIENT Scope" {
+    database TransientCache [
+        No Cache
+        ----
+        New instance
+        Each injection
+    ]
+
+    class TransientProvider {
+        scope: Scope = 'TRANSIENT'
+        instances: Service[]
+    }
+
+    note right of TransientProvider
+        New instance created
+        for every injection
+        Never cached
+        Memory overhead
+        Good for: Request-specific logic
+    end note
+
+    TransientProvider --> TransientCache: never uses
+}
+
+package "REQUEST Scope" {
+    database RequestCache [
+        Request Context Cache
+        ----
+        One instance per request
+        Scoped to HTTP request
+    ]
+
+    class RequestProvider {
+        scope: Scope = 'REQUEST'
+        contextMap: WeakMap<Request, Service>
+    }
+
+    note right of RequestProvider
+        Created once per HTTP request
+        Cached within request context
+        Cleaned up after response
+        Medium overhead
+        Good for: Per-request state
+    end note
+
+    RequestProvider --> RequestCache: caches per-request
+}
+
+package "Instance Lifecycle" {
+    component Init ["New Instance Created"]
+    component Ready ["Instance Ready"]
+    component Use ["In Use (injected)"]
+    component Destroy ["Instance Destroyed"]
+
+    Init --> Ready
+    Ready --> Use
+    Use --> Use: used multiple times
+    Use --> Destroy
+
+    note right of Init
+        Constructor called
+        Dependencies resolved
+        Metadata applied
+    end note
+
+    note right of Ready
+        Instance available
+        Lifecycle hooks called
+        onModuleInit()
+    end note
+
+    note right of Use
+        Injected into services
+        Methods called
+        State maintained
+    end note
+
+    note right of Destroy
+        onModuleDestroy()
+        onApplicationShutdown()
+        Cleanup resources
+    end note
+}
+
+package "Scope Comparison" {
+    component Table [
+        **Scope Comparison Table**
+        ╔════════════════════════════════════╗
+        ║ Metric    │ SINGLETON│TRANSIENT│REQUEST║
+        ╠════════════════════════════════════╣
+        ║ Instance  │ 1         │ N       │ 1/req ║
+        ║ Created   │ 1st use   │ Every   │ Per   ║
+        ║           │           │ inject  │ req   ║
+        ╠════════════════════════════════════╣
+        ║ Memory    │ Low       │ High    │ Med   ║
+        ║ Speed     │ Fast      │ Slow    │ OK    ║
+        ║ Thread    │ Shared    │ Isolated│ Req-  ║
+        ║ Safe      │ No sync   │ Yes     │ safe  ║
+        ╠════════════════════════════════════╣
+        ║ Use Case  │ DB, Cache │ Temp    │ Auth, ║
+        ║           │ Config    │ utils   │ State ║
+        ╚════════════════════════════════════╝
+    ]
+}
+
+package "Multi-Tenant Example" {
+    component HTTPReq1 [Request #1\nTenant A]
+    component HTTPReq2 [Request #2\nTenant B]
+
+    component SingletonService [
+        **Singleton Service**
+        shared_config
+    ]
+
+    component RequestService1 [
+        **Request Scoped**
+        tenant_id: 'A'
+        user_id: 123
+    ]
+
+    component RequestService2 [
+        **Request Scoped**
+        tenant_id: 'B'
+        user_id: 456
+    ]
+
+    HTTPReq1 --> RequestService1: has
+    HTTPReq2 --> RequestService2: has
+
+    RequestService1 --> SingletonService: uses
+    RequestService2 --> SingletonService: uses
+
+    note right of HTTPReq1
+        Each request gets
+        separate REQUEST scoped
+        instance with own context
+    end note
+
+    note right of SingletonService
+        Shared across all
+        requests, cannot store
+        request-specific data
+    end note
+}
+
+package "Lifecycle Hooks" {
+    component OnModuleInit [
+        **OnModuleInit**
+        ----
+        Called when module loaded
+        All dependencies ready
+        Good for: initialization
+    ]
+
+    component OnApplicationBootstrap [
+        **OnApplicationBootstrap**
+        ----
+        Called when app fully started
+        All modules initialized
+        Good for: startup tasks
+    ]
+
+    component OnModuleDestroy [
+        **OnModuleDestroy**
+        ----
+        Called when module destroyed
+        Clean module resources
+        Good for: cleanup
+    ]
+
+    component OnApplicationShutdown [
+        **OnApplicationShutdown**
+        ----
+        Called on app shutdown
+        Final cleanup
+        Good for: database close
+    ]
+
+    OnModuleInit --> OnApplicationBootstrap
+    OnModuleDestroy --> OnApplicationShutdown
+}
+
+@enduml

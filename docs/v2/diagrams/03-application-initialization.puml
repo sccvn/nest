@@ -1,0 +1,183 @@
+@startuml Application Initialization Sequence
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 11
+
+title NestJS Application Bootstrap & Initialization Sequence
+
+actor User
+participant "main.ts" as MAIN
+participant "NestFactory" as FACTORY
+participant "NestContainer" as CONTAINER
+participant "DependenciesScanner" as SCANNER
+participant "InstanceLoader" as LOADER
+participant "RouterResolver" as ROUTER
+participant "NestApplication" as APP
+participant "HTTP Server" as SERVER
+
+User ->> MAIN: npm start
+
+MAIN ->> FACTORY: NestFactory.create(AppModule)
+activate FACTORY
+
+FACTORY ->> CONTAINER: new NestContainer()
+activate CONTAINER
+note right of CONTAINER
+    Initialize empty module registry
+    and global state
+end note
+CONTAINER -->> FACTORY: container
+deactivate CONTAINER
+
+FACTORY ->> FACTORY: new ApplicationConfig()
+note right of FACTORY
+    Create global configuration:
+    - Global pipes
+    - Global guards
+    - Global interceptors
+    - Global exception filters
+end note
+
+FACTORY ->> SCANNER: new DependenciesScanner(container)
+activate SCANNER
+
+SCANNER ->> SCANNER: scan(AppModule)
+note right of SCANNER
+    1. Extract @Module metadata
+    2. Recursively scan imports
+    3. Register all modules
+    4. Build dependency graph
+    5. Calculate module distances
+end note
+
+loop For Each Module in Dependency Graph
+    SCANNER ->> CONTAINER: addModule(moduleMetadata)
+    note right of CONTAINER
+        Register:
+        - Module reference
+        - Providers
+        - Controllers
+        - Exports
+        - Global flag
+    end note
+end
+
+SCANNER ->> LOADER: new InstanceLoader(container)
+activate LOADER
+
+LOADER ->> LOADER: createInstancesOfProviders()
+note right of LOADER
+    For each provider:
+    1. Create InstanceWrapper
+    2. Resolve dependencies
+    3. Instantiate (if SINGLETON)
+    4. Cache instance
+end note
+
+LOADER ->> LOADER: createInstancesOfControllers()
+note right of LOADER
+    For each controller:
+    1. Resolve constructor dependencies
+    2. Create controller instance
+    3. Extract route metadata
+end note
+
+LOADER ->> LOADER: createInstancesOfEnhancers()
+note right of LOADER
+    Instantiate:
+    - Global guards
+    - Global interceptors
+    - Global filters
+    - Global pipes
+end note
+
+LOADER -->> SCANNER: instances created
+deactivate LOADER
+
+SCANNER -->> FACTORY: dependencies scanned & loaded
+deactivate SCANNER
+
+FACTORY ->> ROUTER: new RoutesResolver(container, config)
+activate ROUTER
+
+ROUTER ->> ROUTER: explore(controllers)
+note right of ROUTER
+    For each controller:
+    1. Extract route metadata
+    2. Build routes
+    3. Register with HTTP adapter
+    4. Bind guards/pipes/interceptors
+end note
+
+ROUTER -->> FACTORY: routes registered
+deactivate ROUTER
+
+FACTORY ->> APP: new NestApplication(adapter, container, config)
+activate APP
+note right of APP
+    Initialize application with:
+    - HTTP adapter (Express/Fastify)
+    - Container (modules & providers)
+    - Configuration (global enhancers)
+end note
+APP -->> FACTORY: application
+deactivate APP
+
+FACTORY -->> MAIN: NestApplication
+deactivate FACTORY
+
+MAIN ->> APP: app.listen(3000)
+activate APP
+
+APP ->> APP: applyGlobalPrefix()
+note right of APP
+    Optional: Apply URL prefix
+    to all routes
+end note
+
+APP ->> APP: enableShutdownHooks()
+note right of APP
+    Register handlers for:
+    - SIGTERM
+    - SIGINT
+    - Process exit
+end note
+
+APP ->> SERVER: server.listen(3000)
+activate SERVER
+
+loop For Each onApplicationBootstrap Hook
+    APP ->> APP: call onApplicationBootstrap()
+    note right of APP
+        @Injectable classes
+        implementing
+        OnApplicationBootstrap
+    end note
+end
+
+SERVER -->> APP: listening
+deactivate SERVER
+
+APP -->> MAIN: server ready
+deactivate APP
+
+MAIN -->> User: ✓ Application Running\nListening on port 3000
+
+note over SCANNER, LOADER
+    **Dependency Injection Phase**
+    - All modules scanned
+    - All providers instantiated
+    - All dependencies resolved
+    - Ready to handle requests
+end note
+
+note over ROUTER, APP
+    **Routing Setup Phase**
+    - Routes discovered from decorators
+    - Enhancers (guards/pipes/filters) registered
+    - HTTP adapter configured
+    - Ready to accept connections
+end note
+
+@enduml

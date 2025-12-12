@@ -1,0 +1,195 @@
+@startuml Module Dependency Graph
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 12
+
+title NestJS Module System - Dependency Injection Architecture
+
+package "Core DI Container" {
+    component NestContainer [
+        **NestContainer**
+        ----
+        - modules: Map<token, Module>
+        - globalModules: Set<Module>
+        - moduleDistance: Map<Module, number>
+        ----
+        + addModule(metadata): void
+        + getModules(): Module[]
+        + getGlobalModules(): Module[]
+    ]
+
+    component Module [
+        **Module**
+        ----
+        - imports: Module[]
+        - providers: Map<token, InstanceWrapper>
+        - controllers: any[]
+        - exports: any[]
+        - distance: number
+        ----
+        + addImport(module): void
+        + addProvider(provider): void
+        + addController(controller): void
+    ]
+
+    component InstanceWrapper [
+        **InstanceWrapper<T>**
+        ----
+        - instance: T | null
+        - singleton: Instance
+        - transient: Instance[]
+        - request: WeakMap<Req, Instance>
+        - scope: Scope
+        - dependencies: InstanceWrapper[]
+        ----
+        + getInstance(): T
+        + createInstance(): T
+    ]
+
+    NestContainer --> Module : contains
+    Module --> InstanceWrapper : manages
+}
+
+package "Dependency Resolution" {
+    component Injector [
+        **Injector**
+        ----
+        - container: NestContainer
+        ----
+        + instantiate(target): Instance
+        + resolveConstructorParams(target): any[]
+        + resolveDependency(dep): Instance
+    ]
+
+    component DependenciesScanner [
+        **DependenciesScanner**
+        ----
+        - container: NestContainer
+        - instanceLoader: InstanceLoader
+        ----
+        + scan(root): Promise<void>
+        + scanModuleMetadata(metadata): void
+        + createInstancesForProviders(): void
+    ]
+
+    component InstanceLoader [
+        **InstanceLoader**
+        ----
+        - container: NestContainer
+        - injector: Injector
+        ----
+        + createInstancesOfProviders(): Promise<void>
+        + createInstancesOfControllers(): Promise<void>
+    ]
+
+    DependenciesScanner --> Injector : uses
+    DependenciesScanner --> InstanceLoader : uses
+    Injector --> NestContainer : queries
+    InstanceLoader --> Injector : uses
+}
+
+package "Metadata Processing" {
+    component MetadataExtractor [
+        **MetadataExtractor**
+        ----
+        + getModuleMetadata(): object
+        + getProviderMetadata(): InstanceWrapper[]
+        + getControllerMetadata(): Type[]
+    ]
+
+    component Compiler [
+        **Compiler**
+        ----
+        - container: NestContainer
+        ----
+        + compile(modules): Promise<NestContainer>
+        + compileModule(metadata): void
+        + compileProvider(provider): InstanceWrapper
+    ]
+
+    MetadataExtractor --> Compiler : feeds
+    Compiler --> NestContainer : populates
+}
+
+package "Provider Types" {
+    component ClassProvider [
+        **Class Provider**
+        @Injectable()
+        class MyService
+    ]
+
+    component FactoryProvider [
+        **Factory Provider**
+        useFactory: (deps) => new Service()
+    ]
+
+    component ValueProvider [
+        **Value Provider**
+        useValue: staticValue
+    ]
+
+    component ExistingProvider [
+        **Existing Provider**
+        useExisting: ExistingService
+    ]
+
+    ClassProvider --> InstanceWrapper : instantiated to
+    FactoryProvider --> InstanceWrapper : instantiated to
+    ValueProvider --> InstanceWrapper : instantiated to
+    ExistingProvider --> InstanceWrapper : aliased to
+}
+
+package "Scopes" {
+    component SINGLETON [
+        **SINGLETON**
+        ----
+        Single instance
+        Shared globally
+        Cached
+    ]
+
+    component TRANSIENT [
+        **TRANSIENT**
+        ----
+        New instance
+        Each injection
+        Never cached
+    ]
+
+    component REQUEST [
+        **REQUEST**
+        ----
+        Single instance
+        Per HTTP request
+        Request-scoped cache
+    ]
+
+    SINGLETON -.-> InstanceWrapper : defines scope
+    TRANSIENT -.-> InstanceWrapper : defines scope
+    REQUEST -.-> InstanceWrapper : defines scope
+}
+
+InstanceWrapper --> SINGLETON : uses
+InstanceWrapper --> TRANSIENT : uses
+InstanceWrapper --> REQUEST : uses
+
+note on link Module, NestContainer
+    Modules register themselves
+    in the container during
+    DependenciesScanner.scan()
+end note
+
+note on link Injector, InstanceWrapper
+    Injector resolves dependencies
+    and creates/retrieves instances
+    based on scope configuration
+end note
+
+note on link InstanceLoader, InstanceWrapper
+    InstanceLoader creates all
+    provider instances after
+    scanning is complete
+end note
+
+@enduml

@@ -1,0 +1,253 @@
+@startuml Microservices Architecture
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 10
+
+title NestJS Microservices - Event-Driven Architecture
+
+cloud "Transport Protocols" {
+    component TCP [TCP Transport]
+    component UDP [UDP Transport]
+    component MQTT [MQTT Broker]
+    component NATS [NATS Server]
+    component RABBITMQ [RabbitMQ Broker]
+    component KAFKA [Kafka Cluster]
+    component GRPC [gRPC Server]
+}
+
+package "API Gateway/HTTP Service" {
+    component HTTPController [
+        **HTTP Controller**
+        @Controller('/users')
+        ----
+        createUser(dto)
+        getUser(id)
+    ]
+
+    component ClientProxy [
+        **ClientProxy**
+        ----
+        + send(pattern, data)
+        + emit(pattern, data)
+    ]
+
+    HTTPController --> ClientProxy: calls
+}
+
+package "Microservice 1 - User Service" {
+    component UserMicroservice [
+        **UserMicroservice**
+        ----
+        Transport: TCP
+        Port: 3001
+    ]
+
+    component UserController [
+        **User Controller**
+        @Controller()
+        ----
+        @MessagePattern('createUser')
+        @MessagePattern('getUser')
+    ]
+
+    component UserService [
+        **User Service**
+        ----
+        + createUser()
+        + getUser()
+        + updateUser()
+    ]
+
+    UserMicroservice --> UserController
+    UserController --> UserService
+}
+
+package "Microservice 2 - Order Service" {
+    component OrderMicroservice [
+        **OrderMicroservice**
+        ----
+        Transport: NATS
+        Subject: orders.*
+    ]
+
+    component OrderController [
+        **Order Controller**
+        @Controller()
+        ----
+        @MessagePattern('createOrder')
+        @EventPattern('orderCreated')
+    ]
+
+    component OrderService [
+        **Order Service**
+        ----
+        + createOrder()
+        + processOrder()
+    ]
+
+    OrderMicroservice --> OrderController
+    OrderController --> OrderService
+}
+
+package "Microservice 3 - Notification Service" {
+    component NotificationMicroservice [
+        **Notification Microservice**
+        ----
+        Transport: MQTT
+        Topic: notifications/*
+    ]
+
+    component NotificationController [
+        **Notification Controller**
+        @Controller()
+        ----
+        @EventPattern('userCreated')
+        @EventPattern('orderCreated')
+    ]
+
+    component NotificationService [
+        **Notification Service**
+        ----
+        + sendEmail()
+        + sendSMS()
+    ]
+
+    NotificationMicroservice --> NotificationController
+    NotificationController --> NotificationService
+}
+
+ClientProxy --> TCP: send/emit\n(pattern, payload)
+TCP --> UserMicroservice: message
+
+ClientProxy --> NATS: emit\n(pattern, payload)
+NATS --> OrderMicroservice: event
+
+OrderController --> MQTT: emit('orderCreated', data)
+MQTT --> NotificationMicroservice: event
+
+HTTPController --> ClientProxy: Pattern: 'createUser'
+HTTPController --> ClientProxy: Pattern: 'getUser'
+
+note on link ClientProxy, TCP
+    Request-Response Pattern
+    send() - waits for response
+    Observable<Response>
+end note
+
+note on link ClientProxy, NATS
+    Event Pattern
+    emit() - fire and forget
+    No response expected
+end note
+
+note on link OrderController, MQTT
+    Publish-Subscribe Pattern
+    @EventPattern() listener
+    Async event handling
+end note
+
+package "Message Patterns" {
+    component RequestResponse [
+        **Request-Response**
+        ----
+        client.send(pattern, data)
+        await response
+        Synchronous-style
+    ]
+
+    component EventEmission [
+        **Event Emission**
+        ----
+        client.emit(pattern, data)
+        Fire and forget
+        Asynchronous
+    ]
+
+    component EventListening [
+        **Event Listening**
+        ----
+        @EventPattern(pattern)
+        handler(data)
+        Reactive handler
+    ]
+
+    RequestResponse -.-> HTTPController
+    EventEmission -.-> HTTPController
+    EventListening -.-> NotificationController
+}
+
+package "Transport Configuration" {
+    component TCPTransport [
+        **TCP**
+        ----
+        host, port
+        Request-Response
+        Low latency
+    ]
+
+    component NATSTransport [
+        **NATS**
+        ----
+        servers, subject
+        Pub-Sub pattern
+        Scalable
+    ]
+
+    component MQTTTransport [
+        **MQTT**
+        ----
+        url, options
+        Topic-based routing
+        IoT-friendly
+    ]
+
+    component KafkaTransport [
+        **Kafka**
+        ----
+        brokers, topics
+        Stream processing
+        High throughput
+    ]
+
+    TCPTransport -.-> TCP
+    NATSTransport -.-> NATS
+    MQTTTransport -.-> MQTT
+    KafkaTransport -.-> KAFKA
+}
+
+package "Hybrid Applications" {
+    component HybridApp [
+        **Hybrid Application**
+        ----
+        HTTP Server + Microservice
+        app.listen(3000)
+        app.connectMicroservice()
+        Both protocols simultaneously
+    ]
+
+    HybridApp -.-> HTTPController
+    HybridApp -.-> UserMicroservice
+}
+
+note over HTTPController, ClientProxy
+    Synchronous API:
+    HTTP clients → Request-Response
+    Pattern matching: 'createUser'
+end note
+
+note over UserController, UserService
+    Microservice:
+    Listens on pattern
+    Processes message
+    Sends response (if sync)
+end note
+
+note over NotificationController, NotificationService
+    Event Handler:
+    Listens for events
+    Triggers side effects
+    No response sent
+end note
+
+@enduml

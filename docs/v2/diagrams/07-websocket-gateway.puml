@@ -1,0 +1,231 @@
+@startuml WebSocket Gateway Architecture
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 10
+
+title NestJS WebSocket Gateway - Real-time Communication
+
+participant "WebSocket Client" as CLIENT
+participant "Socket.io Server" as SOCKET_SERVER
+participant "Gateway" as GATEWAY
+participant "Handler" as HANDLER
+participant "Service" as SERVICE
+
+== Connection Phase ==
+
+CLIENT ->> SOCKET_SERVER: WebSocket Connection
+activate SOCKET_SERVER
+
+SOCKET_SERVER ->> GATEWAY: onModuleInit()\n(Gateway lifecycle)
+activate GATEWAY
+note right of GATEWAY
+    @WebSocketGateway({
+        namespace: '/chat',
+        cors: { origin: '*' }
+    })
+end note
+GATEWAY -->> SOCKET_SERVER: Gateway initialized
+deactivate GATEWAY
+
+SOCKET_SERVER ->> CLIENT: ✓ Connected\nSocket ID assigned
+
+== Message Handling Phase ==
+
+CLIENT ->> SOCKET_SERVER: emit('sendMessage', data)
+SOCKET_SERVER ->> GATEWAY: Route message\nto handler
+
+activate GATEWAY
+GATEWAY ->> HANDLER: @SubscribeMessage('sendMessage')\nhandler(@MessageBody data)
+activate HANDLER
+note right of HANDLER
+    Extract message data
+    Validate/Transform via pipes
+    Apply guards if needed
+end note
+
+HANDLER ->> SERVICE: process(data)
+activate SERVICE
+SERVICE ->> SERVICE: Business logic
+SERVICE -->> HANDLER: result
+deactivate SERVICE
+
+HANDLER -->> GATEWAY: response
+deactivate HANDLER
+deactivate GATEWAY
+
+GATEWAY ->> SOCKET_SERVER: Prepare response
+
+== Broadcasting Phase ==
+
+SOCKET_SERVER ->> SOCKET_SERVER: Broadcast or Send
+
+alt Send to Specific Client
+    SOCKET_SERVER ->> CLIENT: emit('messageResponse', result)
+else Broadcast to All
+    SOCKET_SERVER ->> GATEWAY: Call via @ConnectedSocket()
+    note right of GATEWAY
+        @ConnectedSocket() client
+        -> Get current socket
+        -> Broadcast to room
+    end note
+    GATEWAY ->> SERVICE: broadcastMessage(data)
+    SERVICE ->> GATEWAY: Broadcasting...
+    note right of SERVICE
+        client.emit() - specific client
+        client.broadcast.emit() - all except sender
+        io.to(room).emit() - room
+        io.emit() - all clients
+    end note
+    GATEWAY ->> SOCKET_SERVER: Emit to clients
+    loop For Each Connected Client
+        SOCKET_SERVER ->> CLIENT: emit('messageBroadcast', data)
+    end
+end
+
+== Disconnect Phase ==
+
+CLIENT ->> SOCKET_SERVER: Disconnect
+
+SOCKET_SERVER ->> GATEWAY: @SubscribeMessage('disconnect')\nor onModuleDestroy()
+activate GATEWAY
+note right of GATEWAY
+    Cleanup:
+    - Remove from rooms
+    - Release resources
+    - Notify others
+end note
+GATEWAY -->> SOCKET_SERVER: Cleanup complete
+deactivate GATEWAY
+
+deactivate SOCKET_SERVER
+
+package "Gateway Decorators & Metadata" {
+    component GatewayDecorator [
+        **@WebSocketGateway()**
+        ----
+        namespace?: string
+        port?: number
+        cors?: CorsOptions
+        transports?: string[]
+    ]
+
+    component SubscribeMessageDecorator [
+        **@SubscribeMessage()**
+        ----
+        event: string
+        Handler for specific event
+    ]
+
+    component EventPatternDecorator [
+        **@EventPattern()**
+        ----
+        For microservice events
+        Different from SubscribeMessage
+    ]
+
+    component ConnectedSocketDecorator [
+        **@ConnectedSocket()**
+        ----
+        Injects current socket
+        Access socket methods
+    ]
+
+    component MessageBodyDecorator [
+        **@MessageBody()**
+        ----
+        Extract message payload
+        Transform/validate via pipes
+    ]
+
+    component WsExceptionFilterDecorator [
+        **@Catch()**
+        ----
+        Handle WebSocket exceptions
+        Send error to client
+    ]
+}
+
+package "Gateway Implementation Example" {
+    component GatewayClass [
+        **Chat Gateway**
+        ----
+        @WebSocketGateway(
+            {namespace: '/chat'}
+        )
+        @Injectable()
+        class ChatGateway
+          implements OnGatewayConnection
+        {
+            @SubscribeMessage('sendMessage')
+            handleMessage(
+                @ConnectedSocket() client,
+                @MessageBody() data
+            ) {
+                client.broadcast.emit(
+                    'newMessage', data
+                );
+            }
+
+            handleConnection(client) {
+                // client connected
+            }
+
+            handleDisconnect(client) {
+                // client disconnected
+            }
+        }
+    ]
+}
+
+package "Socket.io Adapter Methods" {
+    component DirectEmit [
+        **Direct Emit**
+        ----
+        client.emit('event', data)
+        Send to specific client
+    ]
+
+    component BroadcastEmit [
+        **Broadcast**
+        ----
+        client.broadcast.emit('event')
+        All except sender
+    ]
+
+    component RoomEmit [
+        **Room**
+        ----
+        io.to(roomId).emit('event')
+        All in specific room
+    ]
+
+    component GlobalEmit [
+        **Global**
+        ----
+        io.emit('event', data)
+        All connected clients
+    ]
+
+    note right of DirectEmit
+        One-to-one communication
+        Private messages
+    end note
+
+    note right of BroadcastEmit
+        One-to-many except sender
+        Chat messages
+    end note
+
+    note right of RoomEmit
+        Topic-based routing
+        Grouped messaging
+    end note
+
+    note right of GlobalEmit
+        System announcements
+        Server notifications
+    end note
+}
+
+@enduml

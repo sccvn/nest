@@ -1,0 +1,289 @@
+@startuml Decorator & Metadata System
+!theme plain
+skinparam linetype ortho
+skinparam backgroundColor #F5F5F5
+skinparam defaultFontSize 11
+
+title NestJS Decorator & Metadata-Driven Architecture
+
+package "Decorator Definitions" {
+    interface Decorator [
+        TypeScript Decorators
+        ----
+        Applied at class/method/parameter level
+        Stored via reflect-metadata
+    ]
+
+    component ModuleDecorator [
+        **@Module()**
+        ----
+        imports: Module[]
+        providers: Provider[]
+        controllers: Controller[]
+        exports: any[]
+    ]
+
+    component InjectableDecorator [
+        **@Injectable()**
+        ----
+        scope?: Scope
+        Marks class for DI
+    ]
+
+    component ControllerDecorator [
+        **@Controller()**
+        ----
+        path?: string
+        Associates routes with handler
+    ]
+
+    component GuardDecorator [
+        **@UseGuards()**
+        ----
+        Guards to apply
+        Scope: parameter/method/class
+    ]
+
+    component PipeDecorator [
+        **@UsePipes()**
+        ----
+        Pipes to apply
+        Transform/validate data
+    ]
+
+    component InterceptorDecorator [
+        **@UseInterceptors()**
+        ----
+        Interceptors to apply
+        AOP enhancement
+    ]
+
+    component FilterDecorator [
+        **@UseFilters()**
+        ----
+        Exception filters
+        Error handling
+    ]
+
+    Decorator --> ModuleDecorator
+    Decorator --> InjectableDecorator
+    Decorator --> ControllerDecorator
+    Decorator --> GuardDecorator
+    Decorator --> PipeDecorator
+    Decorator --> InterceptorDecorator
+    Decorator --> FilterDecorator
+}
+
+package "Route Decorators" {
+    component HttpMethodDecorators [
+        **HTTP Methods**
+        ----
+        @Get(path?)
+        @Post(path?)
+        @Put(path?)
+        @Delete(path?)
+        @Patch(path?)
+        @Head(path?)
+        @Options(path?)
+        @All(path?)
+    ]
+
+    component ParameterDecorators [
+        **Parameter Extraction**
+        ----
+        @Param(key?)
+        @Query(key?)
+        @Body(pipe?)
+        @Headers(name?)
+        @Req()
+        @Res()
+        @Next()
+        @Ip()
+        @HostParam()
+    ]
+
+    component ResponseDecorators [
+        **Response Configuration**
+        ----
+        @HttpCode(statusCode)
+        @Redirect(url, statusCode)
+        @Header(name, value)
+        @SetMetadata(key, value)
+    ]
+
+    HttpMethodDecorators --> ParameterDecorators
+    ParameterDecorators --> ResponseDecorators
+}
+
+package "Metadata Storage" {
+    component MetadataKeys [
+        **Metadata Key Constants**
+        ----
+        MODULE_METADATA
+        INJECTABLE_METADATA
+        CONTROLLER_METADATA
+        ROUTE_ARGS_METADATA
+        GUARDS_METADATA
+        PIPES_METADATA
+        INTERCEPTORS_METADATA
+        FILTER_METADATA
+    ]
+
+    component ReflectMetadata [
+        **reflect-metadata Library**
+        ----
+        Reflect.getMetadata(key, target)
+        Reflect.defineMetadata(key, value, target)
+        Stores metadata on class/method/param
+    ]
+
+    component MetadataStorage [
+        **Metadata Storage**
+        ----
+        WeakMaps for efficiency
+        Keyed by class reference
+        Hierarchical: param → method → class
+    ]
+
+    MetadataKeys --> ReflectMetadata
+    ReflectMetadata --> MetadataStorage
+}
+
+package "Metadata Extraction" {
+    component MetadataExtractor [
+        **MetadataExtractor**
+        ----
+        + getMetadata(key, target)
+        + getModuleMetadata(module)
+        + getControllerMetadata(ctrl)
+        + getRouteMetadata(handler)
+        + getParameterMetadata(handler)
+    ]
+
+    component ControllerMetadataExplorer [
+        **ControllerMetadataExplorer**
+        ----
+        + explore(controller)
+        - Finds @Controller metadata
+        - Maps routes from methods
+        - Extracts enhancers
+    ]
+
+    component GatewayMetadataExplorer [
+        **GatewayMetadataExplorer**
+        ----
+        + explore(gateway)
+        - Finds @WebSocketGateway
+        - Maps @SubscribeMessage
+        - Extracts handlers
+    ]
+
+    MetadataExtractor --> ControllerMetadataExplorer
+    MetadataExtractor --> GatewayMetadataExplorer
+}
+
+package "Execution Context" {
+    component ExecutionContext [
+        **ExecutionContext**
+        ----
+        + getClass(): Type
+        + getHandler(): Function
+        + getArgs(): any[]
+        + switchToHttp(): HttpArgumentsHost
+        + switchToWs(): WsArgumentsHost
+        + switchToRpc(): RpcArgumentsHost
+    ]
+
+    component HttpArgumentsHost [
+        **HttpArgumentsHost**
+        ----
+        + getRequest(): Request
+        + getResponse(): Response
+        + getNext(): NextFunction
+    ]
+
+    component WsArgumentsHost [
+        **WsArgumentsHost**
+        ----
+        + getClient(): Socket
+        + getData(): any
+    ]
+
+    component RpcArgumentsHost [
+        **RpcArgumentsHost**
+        ----
+        + getData(): any
+        + getContext(): object
+    ]
+
+    ExecutionContext --> HttpArgumentsHost
+    ExecutionContext --> WsArgumentsHost
+    ExecutionContext --> RpcArgumentsHost
+}
+
+package "Decorator Application Flow" {
+    component TargetClass [
+        **Target Class**
+        @Module()
+        @Injectable()
+        class MyService
+    ]
+
+    component DecoratorApplication [
+        **@Decorator Applied**
+        Metadata stored on prototype
+    ]
+
+    component ScannerPhase [
+        **Scanner Phase**
+        Reads metadata from class
+        Extracts all decorators
+    ]
+
+    component InstanceCreation [
+        **Instance Creation**
+        Uses metadata to:
+        - Resolve dependencies
+        - Create with correct config
+    ]
+
+    component RequestHandling [
+        **Request Handling**
+        Uses metadata to:
+        - Apply guards
+        - Apply pipes
+        - Apply interceptors
+        - Apply filters
+    ]
+
+    TargetClass --> DecoratorApplication
+    DecoratorApplication --> ScannerPhase
+    ScannerPhase --> InstanceCreation
+    InstanceCreation --> RequestHandling
+}
+
+note over ModuleDecorator, FilterDecorator
+    Decorators define metadata
+    applied at design time
+    using TypeScript compiler
+end note
+
+note over ReflectMetadata, MetadataStorage
+    reflect-metadata provides
+    the mechanism to store
+    and retrieve metadata
+end note
+
+note over MetadataExtractor, GatewayMetadataExplorer
+    Explorers scan class metadata
+    and build internal structures
+    for routing and DI
+end note
+
+note over HttpArgumentsHost, RpcArgumentsHost
+    Context abstraction allows
+    same code to work across
+    HTTP, WebSocket, gRPC
+end note
+
+@enduml
