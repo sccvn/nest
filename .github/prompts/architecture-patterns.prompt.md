@@ -1,3 +1,10 @@
+---
+name: architecture-patterns
+description: Provides expertise in software architecture patterns, design patterns, and architectural decision-making for building robust, scalable systems.
+model: Claude Opus 4.5 (Preview) (copilot)
+agent: senior-software-architect
+---
+
 # Architecture Patterns Expertise
 
 ## Overview

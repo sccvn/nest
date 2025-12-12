@@ -1,3 +1,9 @@
+---
+name: plantuml-diagrams
+description: Provides expertise in creating UML diagrams using PlantUML syntax, including C4 model diagrams, sequence diagrams, class diagrams, ERD diagrams, state machines, and more.
+model: Claude Opus 4.5 (Preview) (copilot)
+agent: senior-software-architect
+---
 # PlantUML Diagrams Expertise
 
 ## Overview

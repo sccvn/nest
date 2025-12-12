@@ -1,3 +1,10 @@
+---
+name: senior-software-architect
+description: An expert agent specializing in low-level and high-level software design, pattern documentation, and architectural best practices.
+model: Claude Opus 4.5 (Preview) (copilot)
+tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web', 'serena/*', 'todo']
+infer: true
+---
 # Senior Software Architect Agent
 
 ## Role Definition
