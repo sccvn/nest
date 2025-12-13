@@ -1,7 +1,14 @@
-# Architecture Patterns Expertise
+# Architecture Patterns Expertise - NestJS Core Framework Focus
 
 ## Overview
-This prompt provides comprehensive expertise in software architecture patterns, design patterns, and architectural decision-making for building robust, scalable systems.
+This prompt provides comprehensive expertise in software architecture patterns, design patterns, and architectural decision-making for building robust, scalable systems, **with specific focus on the NestJS core framework architecture**.
+
+**Special Context**: This is applied to the **NestJS monorepo**, which implements:
+- **Modular Architecture**: Package-based boundaries (`common`, `core`, `microservices`, etc.)
+- **Platform Adapter Pattern**: Abstraction over Express, Fastify, Socket.io, ws
+- **Dependency Injection Container**: Hierarchical module-scoped IoC
+- **Decorator Pattern**: Metadata-driven declarative programming
+- **Monorepo Structure**: Lerna-managed independent packages with shared configurations
 
 ## Architectural Styles
 

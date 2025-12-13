@@ -1593,3 +1593,526 @@ When activated, follow this protocol:
 - Hierarchical: Tiered control, large projects
 - Ring: Sequential workflows, pipelines
 - Star: Centralized control, simple coordination
+
+---
+
+## NestJS-Specific Context & Expertise
+
+### Project Overview: NestJS Core Framework
+
+This repository is the **NestJS core framework** (v11.1.6+) - a progressive Node.js framework for building efficient, reliable, and scalable server-side applications, inspired by Angular's architecture.
+
+#### **Monorepo Architecture (Lerna-managed)**
+
+**Core Packages Structure:**
+```
+packages/
+├── common/          - Decorators, interfaces, utilities, constants, DTOs
+├── core/            - DI container, module system, lifecycle hooks, router
+├── microservices/   - Message patterns, transporters (Redis, NATS, Kafka, RabbitMQ, gRPC)
+├── platform-express/ - Express HTTP adapter
+├── platform-fastify/ - Fastify HTTP adapter  
+├── platform-socket.io/ - Socket.io WebSocket adapter
+├── platform-ws/     - ws WebSocket adapter
+├── testing/         - TestingModule, mock utilities
+└── websockets/      - WebSocket gateway abstractions
+```
+
+**Supporting Directories:**
+- `sample/` - 35+ working examples (cats-app, microservices, GraphQL, etc.)
+- `integration/` - E2E test suites with Docker dependencies
+- `benchmarks/` - Performance comparison tests
+
+#### **Core Architectural Patterns**
+
+##### 1. **Module System (Hierarchical Dependency Graph)**
+
+```typescript
+@Module({
+  imports: [DatabaseModule, ConfigModule.forRoot()],  // Module dependencies
+  controllers: [CatsController],                      // Route handlers
+  providers: [                                        // Injectable services
+    CatsService,
+    { provide: 'CAT_REPOSITORY', useClass: CatRepository },
+    { provide: 'CONFIG', useFactory: configFactory, inject: [ConfigService] }
+  ],
+  exports: [CatsService, 'CAT_REPOSITORY']           // Public API
+})
+export class CatsModule {}
+```
+
+**Module Features:**
+- Dependency injection container per module
+- Lazy loading support (`LazyModuleLoader`)
+- Dynamic modules with `.forRoot()` / `.forFeature()` pattern
+- Global modules (`@Global()` decorator)
+- Module re-exporting for API composition
+
+##### 2. **Dependency Injection System**
+
+**Provider Scopes:**
+```typescript
+// DEFAULT (Singleton) - One instance per application
+@Injectable({ scope: Scope.DEFAULT })
+export class SingletonService {}
+
+// REQUEST - New instance per HTTP request
+@Injectable({ scope: Scope.REQUEST })
+export class PerRequestService {
+  constructor(@Inject(REQUEST) private request: Request) {}
+}
+
+// TRANSIENT - New instance per injection point
+@Injectable({ scope: Scope.TRANSIENT })
+export class TransientService {}
+```
+
+**Injection Patterns:**
+```typescript
+// Constructor injection (standard)
+constructor(private readonly service: CatsService) {}
+
+// Token-based injection
+constructor(@Inject('CONFIG') private config: Config) {}
+
+// Optional dependencies
+constructor(@Optional() @Inject('LOGGER') private logger?: Logger) {}
+
+// Property injection (rare, avoid if possible)
+@Inject('CONFIG') private readonly config: Config;
+```
+
+##### 3. **Request Lifecycle & Middleware Pipeline**
+
+```
+Incoming Request
+    │
+    ▼
+┌────────────────────┐
+│   Middleware       │ (express/fastify middleware, CORS, helmet, etc.)
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│   Guards           │ (Authentication, Authorization)
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│   Interceptors     │ (BEFORE handler - logging, transformation)
+│   (pre-handler)    │
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│   Pipes            │ (Validation, Transformation)
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│   Route Handler    │ (@Get, @Post, @Put, @Delete, etc.)
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│   Interceptors     │ (AFTER handler - response transformation)
+│   (post-handler)   │
+└────────────────────┘
+    │
+    ▼
+┌────────────────────┐
+│ Exception Filters  │ (Error handling, formatting)
+└────────────────────┘
+    │
+    ▼
+Response to Client
+```
+
+##### 4. **Controller Pattern (Route Handlers)**
+
+```typescript
+@Controller('cats')  // Route prefix
+@UseGuards(AuthGuard)  // Apply guard to all routes
+@UseInterceptors(LoggingInterceptor)
+export class CatsController {
+  constructor(
+    private readonly catsService: CatsService,
+    private readonly logger: Logger
+  ) {}
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async create(@Body() createCatDto: CreateCatDto): Promise<Cat> {
+    return this.catsService.create(createCatDto);
+  }
+
+  @Get()
+  @UseInterceptors(CacheInterceptor)
+  async findAll(
+    @Query('limit', ParseIntPipe) limit: number = 10
+  ): Promise<Cat[]> {
+    return this.catsService.findAll(limit);
+  }
+
+  @Get(':id')
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: Request
+  ): Promise<Cat> {
+    return this.catsService.findOne(id);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() updateCatDto: UpdateCatDto
+  ): Promise<Cat> {
+    return this.catsService.update(id, updateCatDto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param('id') id: string): Promise<void> {
+    await this.catsService.remove(id);
+  }
+}
+```
+
+##### 5. **Exception Handling**
+
+```typescript
+// Built-in HTTP exceptions
+throw new BadRequestException('Invalid input');
+throw new UnauthorizedException('Invalid credentials');
+throw new ForbiddenException('Insufficient permissions');
+throw new NotFoundException('Cat not found');
+throw new ConflictException('Cat already exists');
+throw new InternalServerErrorException('Database connection failed');
+
+// Custom exception filters
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      message: exception.message,
+    });
+  }
+}
+```
+
+##### 6. **Validation & Transformation (DTOs)**
+
+```typescript
+import { IsString, IsInt, Min, Max, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateCatDto {
+  @IsString()
+  @Length(1, 50)
+  name: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(30)
+  @Type(() => Number)
+  age: number;
+
+  @IsString()
+  @IsOptional()
+  breed?: string;
+}
+
+// Apply globally
+app.useGlobalPipes(new ValidationPipe({
+  whitelist: true,          // Strip properties not in DTO
+  forbidNonWhitelisted: true, // Throw error for extra properties
+  transform: true,          // Auto-transform payloads to DTO instances
+  transformOptions: {
+    enableImplicitConversion: true
+  }
+}));
+```
+
+##### 7. **Testing Patterns (Mocha + Chai)**
+
+**Unit Test Example:**
+```typescript
+import { expect } from 'chai';
+import { Test, TestingModule } from '@nestjs/testing';
+import { CatsService } from './cats.service';
+import { CatRepository } from './cat.repository';
+
+describe('CatsService', () => {
+  let service: CatsService;
+  let repository: CatRepository;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CatsService,
+        {
+          provide: CatRepository,
+          useValue: {
+            findAll: () => Promise.resolve([]),
+            findOne: () => Promise.resolve(null),
+            create: (cat) => Promise.resolve({ id: '1', ...cat }),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<CatsService>(CatsService);
+    repository = module.get<CatRepository>(CatRepository);
+  });
+
+  it('should be defined', () => {
+    expect(service).to.exist;
+  });
+
+  it('should create a cat', async () => {
+    const catDto = { name: 'Whiskers', age: 3 };
+    const result = await service.create(catDto);
+    
+    expect(result).to.have.property('id');
+    expect(result.name).to.equal('Whiskers');
+  });
+});
+```
+
+**E2E Test Example:**
+```typescript
+import { expect } from 'chai';
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../src/app.module';
+
+describe('CatsController (e2e)', () => {
+  let app: INestApplication;
+
+  before(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  after(async () => {
+    await app.close();
+  });
+
+  it('/cats (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/cats')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).to.be.an('array');
+      });
+  });
+
+  it('/cats (POST)', () => {
+    return request(app.getHttpServer())
+      .post('/cats')
+      .send({ name: 'Fluffy', age: 2 })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body).to.have.property('id');
+        expect(res.body.name).to.equal('Fluffy');
+      });
+  });
+});
+```
+
+#### **NestJS Design Patterns in Use**
+
+| Pattern | Location | Purpose |
+|---------|----------|---------|
+| **Dependency Injection** | `packages/core/injector/` | IoC container, provider resolution |
+| **Decorator Pattern** | `packages/common/decorators/` | Metadata attachment, declarative programming |
+| **Factory Pattern** | Dynamic modules, providers | Flexible object creation |
+| **Adapter Pattern** | `packages/platform-*` | HTTP/WebSocket platform abstraction |
+| **Observer Pattern** | Lifecycle hooks, event emitters | Reactive programming |
+| **Strategy Pattern** | Guards, interceptors, pipes | Pluggable behavior |
+| **Singleton Pattern** | Module system, providers | Shared instance management |
+| **Chain of Responsibility** | Middleware pipeline, exception filters | Request processing |
+| **Proxy Pattern** | Interceptors | Request/response manipulation |
+| **Template Method** | Base classes, abstract classes | Lifecycle enforcement |
+
+#### **Code Quality Standards**
+
+**Linting & Formatting:**
+```json
+// ESLint rules specific to NestJS
+{
+  "rules": {
+    "@typescript-eslint/interface-name-prefix": "off",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-explicit-any": "off"
+  }
+}
+```
+
+**Testing Requirements:**
+- Unit tests: `packages/**/*.spec.ts` (Mocha/Chai)
+- Integration tests: `integration/**/e2e/*.spec.ts` or `integration/**/test/*.spec.ts`
+- Coverage target: > 80%
+- Test commands:
+  - `npm test` - Run all unit tests
+  - `npm run test:cov` - Run tests with coverage
+  - `npm run test:integration` - Run integration tests
+
+**Commit Conventions:**
+```
+feat(core): add support for lazy module loading
+fix(common): resolve decorator metadata reflection issue
+chore(deps): update dependencies to latest versions
+docs(readme): improve getting started guide
+test(microservices): add tests for NATS transporter
+perf(router): optimize route matching algorithm
+refactor(injector): simplify provider resolution logic
+```
+
+#### **When Working on NestJS Core:**
+
+✅ **DO:**
+1. **Understand the injector first** - Study `packages/core/injector/` as it's the heart of the framework
+2. **Follow decorator patterns** - Consistent metadata attachment via `reflect-metadata`
+3. **Maintain backward compatibility** - NestJS has a large user base, breaking changes require deprecation
+4. **Write comprehensive tests** - Both unit (`.spec.ts`) and integration (`integration/`)
+5. **Check existing samples** - `sample/` directory has 35+ examples to reference
+6. **Use TypeScript strictly** - Full type safety, no `any` unless absolutely necessary
+7. **Consider platform agnosticism** - Code should work with Express, Fastify, and future adapters
+8. **Document public APIs** - TSDoc comments for all exported interfaces, classes, decorators
+9. **Benchmark performance** - Run `npm run codechecks:benchmarks` for performance-critical changes
+10. **Update changelogs** - `npm run changelog` generates release notes
+
+❌ **DON'T:**
+1. **Don't mix test frameworks** - This project uses Mocha/Chai, NOT Jest
+2. **Don't bypass DI** - Always use the injector, avoid global state or singletons outside DI
+3. **Don't break module boundaries** - Core shouldn't depend on platform-specific code
+4. **Don't use `class-validator` in core** - Validation is in application layer, not framework layer
+5. **Don't add unnecessary dependencies** - Bundle size matters, evaluate alternatives
+6. **Don't ignore the request pipeline** - Middleware → Guards → Interceptors → Pipes → Handler → Interceptors → Filters
+7. **Don't create circular dependencies** - Module system enforces acyclic graphs
+8. **Don't hardcode platform assumptions** - Express vs Fastify differences must be abstracted
+
+#### **Critical Framework Internals**
+
+**1. Module Instantiation Flow:**
+```
+Application Bootstrap
+  → NestFactory.create()
+    → Module Compilation (dependency resolution)
+      → Provider Registration
+        → Dependency Injection
+          → Controller Registration
+            → Route Mapping
+              → Middleware Registration
+                → Application Ready
+```
+
+**2. Metadata Keys (from `@nestjs/common/constants`):**
+```typescript
+MODULE_METADATA              // Module definition
+PARAMTYPES_METADATA          // Constructor parameters
+SELF_DECLARED_DEPS_METADATA  // Explicit dependencies
+OPTIONAL_DEPS_METADATA       // Optional dependencies
+PROPERTY_DEPS_METADATA       // Property injection
+SCOPE_OPTIONS_METADATA       // Provider scope
+GUARDS_METADATA              // Route guards
+INTERCEPTORS_METADATA        // Interceptors
+PIPES_METADATA               // Validation pipes
+EXCEPTION_FILTERS_METADATA   // Exception handlers
+ROUTE_ARGS_METADATA          // Parameter decorators
+```
+
+**3. Lifecycle Hooks (Execution Order):**
+```
+1. onModuleInit()       - Module initialization
+2. onApplicationBootstrap() - After all modules initialized
+3. [Application Running] 
+4. onModuleDestroy()    - Before module cleanup
+5. beforeApplicationShutdown() - Before app shutdown
+6. onApplicationShutdown() - During shutdown
+```
+
+#### **Common Pitfalls & Solutions**
+
+| Pitfall | Solution |
+|---------|----------|
+| Circular dependencies between modules | Use `forwardRef()` or restructure modules |
+| Providers not found at runtime | Ensure provider is in module's `providers` array |
+| Guards/Interceptors not executing | Check execution context and binding scope |
+| Request scope breaking singleton dependencies | Use `ModuleRef.resolve()` for dynamic resolution |
+| Metadata not available | Ensure `reflect-metadata` is imported before decorators |
+| Tests failing with DI errors | Use `Test.createTestingModule()` for proper module mocking |
+| Performance degradation | Check for REQUEST-scoped providers, use DEFAULT when possible |
+| WebSocket not connecting | Verify adapter configuration and CORS settings |
+
+#### **Architecture Decision Records (ADRs)**
+
+**ADR-001: Why Decorator-Based Architecture?**
+- **Decision**: Use TypeScript decorators for declarative programming
+- **Rationale**: Clean separation of concerns, metadata-driven configuration, Angular-like DX
+- **Consequences**: Requires `experimentalDecorators` and `emitDecoratorMetadata` in tsconfig
+
+**ADR-002: Why Multiple Platform Adapters?**
+- **Decision**: Support Express, Fastify, and other HTTP libraries
+- **Rationale**: Performance flexibility, existing ecosystem integration, no vendor lock-in
+- **Consequences**: Core must remain platform-agnostic, abstract HTTP interfaces
+
+**ADR-003: Why Hierarchical Dependency Injection?**
+- **Decision**: Module-scoped DI containers with provider visibility rules
+- **Rationale**: Encapsulation, lazy loading, memory efficiency, clear boundaries
+- **Consequences**: Circular dependencies harder to resolve, requires explicit exports
+
+**ADR-004: Why Mocha Instead of Jest?**
+- **Decision**: Use Mocha + Chai for testing
+- **Rationale**: Lighter weight, more flexible, better async handling for complex scenarios
+- **Consequences**: Community might expect Jest, but test patterns remain portable
+
+#### **Performance Considerations**
+
+**Benchmarks (from `benchmarks/`):**
+```
+Platform          | Requests/sec | Latency (avg) | Throughput
+------------------|--------------|---------------|------------
+Express (raw)     | ~15,000      | 6.5ms         | High
+Fastify (raw)     | ~45,000      | 2.2ms         | Very High
+NestJS + Express  | ~12,000      | 8.2ms         | Good
+NestJS + Fastify  | ~38,000      | 2.6ms         | Excellent
+```
+
+**Optimization Tips:**
+1. Use Fastify adapter for high-throughput APIs
+2. Keep providers in DEFAULT scope (singleton) unless request data needed
+3. Avoid REQUEST scope when possible (creates new instances per request)
+4. Use interceptors sparingly on high-traffic routes
+5. Enable HTTP/2 for multiplexing
+6. Cache expensive computations
+7. Use lazy loading for large applications
+
+#### **When to Use Each Agent**
+
+| Task | Primary Agent | Why |
+|------|---------------|-----|
+| Extract NestJS module architecture | `senior-solution-architect` | C4 diagrams, module relationships |
+| Analyze DI container patterns | `senior-software-architect` | Injector pattern detection |
+| Plan new framework feature (e.g., new decorator) | `senior-business-analyst` | Requirements, BDD, user impact |
+| Implement new decorator or provider | `senior-software-engineer` | TDD, implementation guidance |
+| Review framework code changes | `lead-code-reviewer` | Pattern compliance, breaking changes |
+| Test new HTTP adapter | `senior-automation-tester` | Integration tests, load tests |
+
+---

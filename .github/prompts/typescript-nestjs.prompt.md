@@ -1,7 +1,18 @@
-# TypeScript NestJS Framework Expertise
+# TypeScript NestJS Core Framework Development Expertise
 
 ## Overview
-This prompt provides deep expertise in NestJS framework development, including best practices, patterns, and advanced techniques for building enterprise-grade applications.
+This prompt provides deep expertise in **NestJS core framework development** (v11.1.6+), including architectural patterns, dependency injection internals, decorator system, testing strategies, and best practices for contributing to the framework itself or building framework-grade modules.
+
+**Target Audience**: Framework contributors, library authors, and advanced NestJS developers working on the core codebase.
+
+**Key Focus Areas**:
+- NestJS core architecture and internals
+- Dependency injection container implementation
+- Decorator metadata system
+- Module compilation and resolution
+- Platform adapter patterns
+- Framework testing strategies (Mocha/Chai)
+- Monorepo management (Lerna)
 
 ## Core Concepts
 

@@ -234,10 +234,35 @@ This repository is the **NestJS core framework** - a progressive Node.js framewo
 2. Follow template in `.github/instructions/INSTRUCTION.md`
 3. Document workflow patterns
 
+## NestJS-Specific Enhancements
+
+The multi-agent system has been **fine-tuned for the NestJS core framework** with:
+
+- ✅ **750+ lines** of NestJS-specific context in `ai-augmented-engineer` agent
+- ✅ **Mocha + Chai** testing patterns (critical: NOT Jest)
+- ✅ **Framework architecture** documentation (DI container, decorators, adapters)
+- ✅ **Code review checklist** with 200+ NestJS-specific checkpoints
+- ✅ **Module architecture template** for documentation
+- ✅ **Backward compatibility** and bundle size awareness
+
+**Key Resources**:
+- Full tuning summary: [docs/v2/multi-agent-system-nestjs-tuning.md](../docs/v2/multi-agent-system-nestjs-tuning.md)
+- Architecture template: [.github/templates/nestjs-module-architecture.template.md](.github/templates/nestjs-module-architecture.template.md)
+- Code review checklist: [.github/templates/nestjs-code-review-checklist.md](.github/templates/nestjs-code-review-checklist.md)
+- Enhanced agent: [.github/agents/ai-augmented-engineer.agent.md](.github/agents/ai-augmented-engineer.agent.md)
+
+**Critical Framework Context**:
+- Monorepo: Lerna-managed, 9 packages (common, core, microservices, platform-*, testing, websockets)
+- Testing: **Mocha + Chai** (use `expect().to.equal()`, NOT `toBe()`)
+- DI Scopes: DEFAULT (singleton), REQUEST, TRANSIENT
+- Request Pipeline: Middleware → Guards → Interceptors → Pipes → Handler → Interceptors → Filters
+- Platform Agnostic: Express, Fastify, Socket.io, ws adapters
+
 ## Support
 
 For issues or enhancements to the multi-agent system:
 1. Check existing agents and prompts
 2. Review INSTRUCTION.md files for guidance
-3. Follow naming conventions strictly
-4. Test with sample tasks before deployment
+3. See [multi-agent-system-nestjs-tuning.md](../docs/v2/multi-agent-system-nestjs-tuning.md) for NestJS-specific details
+4. Follow naming conventions strictly
+5. Test with sample tasks before deployment

@@ -1,7 +1,14 @@
-# BDD/TDD Testing Methodology Expertise
+# BDD/TDD Testing Methodology Expertise - NestJS Core Framework
 
 ## Overview
-This prompt provides comprehensive expertise in Behavior-Driven Development (BDD) and Test-Driven Development (TDD) methodologies for creating high-quality, well-tested software.
+This prompt provides comprehensive expertise in Behavior-Driven Development (BDD) and Test-Driven Development (TDD) methodologies for creating high-quality, well-tested software, **specifically adapted for NestJS core framework development**.
+
+**Critical Context**: 
+- This project uses **Mocha + Chai**, NOT Jest
+- Test structure: Unit tests (`.spec.ts`) alongside source, E2E tests in `integration/`
+- Coverage target: > 80%
+- Test assertions: `expect().to.equal()`, `expect().to.be.true` (Chai syntax)
+- Async patterns: `async/await` with Mocha's `it()`, `before()`, `after()` hooks
 
 ## Behavior-Driven Development (BDD)
 

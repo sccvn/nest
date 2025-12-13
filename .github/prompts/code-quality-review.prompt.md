@@ -1,7 +1,16 @@
-# Code Quality and Security Review Expertise
+# Code Quality and Security Review Expertise - NestJS Core Framework
 
 ## Overview
-This prompt provides comprehensive expertise in code quality assessment, security review, and compliance checking using industry-standard tools and best practices.
+This prompt provides comprehensive expertise in code quality assessment, security review, and compliance checking using industry-standard tools and best practices, **specifically tailored for the NestJS core framework codebase**.
+
+**Framework-Specific Considerations**:
+- **Backward Compatibility**: Public APIs must maintain compatibility or provide deprecation paths
+- **Bundle Size**: Dependencies impact framework consumers, evaluate carefully
+- **Platform Agnostic**: Code must work with Express, Fastify, and future adapters
+- **Metadata System**: Proper use of `reflect-metadata` for decorator implementation
+- **Testing**: Mocha/Chai patterns, >80% coverage requirement
+- **Linting**: ESLint with NestJS-specific rules
+- **Commit Convention**: Conventional Commits (feat, fix, chore, docs, test, perf, refactor)
 
 ## Code Quality Standards
 
