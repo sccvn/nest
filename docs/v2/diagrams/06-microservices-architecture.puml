@@ -61,6 +61,12 @@ package "Microservice 1 - User Service" {
 
     UserMicroservice --> UserController
     UserController --> UserService
+    note on link
+        Microservice:
+        Listens on pattern
+        Processes message
+        Sends response (if sync)
+    end note
 }
 
 package "Microservice 2 - Order Service" {
@@ -115,37 +121,47 @@ package "Microservice 3 - Notification Service" {
 
     NotificationMicroservice --> NotificationController
     NotificationController --> NotificationService
+    note on link
+        Event Handler:
+        Listens for events
+        Triggers side effects
+        No response sent
+    end note
 }
 
 ClientProxy --> TCP: send/emit\n(pattern, payload)
-TCP --> UserMicroservice: message
-
-ClientProxy --> NATS: emit\n(pattern, payload)
-NATS --> OrderMicroservice: event
-
-OrderController --> MQTT: emit('orderCreated', data)
-MQTT --> NotificationMicroservice: event
-
-HTTPController --> ClientProxy: Pattern: 'createUser'
-HTTPController --> ClientProxy: Pattern: 'getUser'
-
-note on link ClientProxy, TCP
+note on link
     Request-Response Pattern
     send() - waits for response
     Observable<Response>
 end note
+TCP --> UserMicroservice: message
 
-note on link ClientProxy, NATS
+ClientProxy --> NATS: emit\n(pattern, payload)
+note on link
     Event Pattern
     emit() - fire and forget
     No response expected
 end note
+NATS --> OrderMicroservice: event
 
-note on link OrderController, MQTT
+OrderController --> MQTT: emit('orderCreated', data)
+note on link
     Publish-Subscribe Pattern
     @EventPattern() listener
     Async event handling
 end note
+MQTT --> NotificationMicroservice: event
+
+HTTPController --> ClientProxy: Pattern: 'createUser'
+note on link
+    Synchronous API:
+    HTTP clients → Request-Response
+    Pattern matching: 'createUser'
+end note
+HTTPController --> ClientProxy: Pattern: 'getUser'
+
+
 
 package "Message Patterns" {
     component RequestResponse [
@@ -229,25 +245,5 @@ package "Hybrid Applications" {
     HybridApp -.-> HTTPController
     HybridApp -.-> UserMicroservice
 }
-
-note over HTTPController, ClientProxy
-    Synchronous API:
-    HTTP clients → Request-Response
-    Pattern matching: 'createUser'
-end note
-
-note over UserController, UserService
-    Microservice:
-    Listens on pattern
-    Processes message
-    Sends response (if sync)
-end note
-
-note over NotificationController, NotificationService
-    Event Handler:
-    Listens for events
-    Triggers side effects
-    No response sent
-end note
 
 @enduml
